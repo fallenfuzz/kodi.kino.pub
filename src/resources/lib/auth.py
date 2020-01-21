@@ -1,13 +1,10 @@
 # -*- coding: utf-8 -*-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import unicode_literals
-
 import json
 import platform
 import time
-import urllib
-import urllib2
+import urllib.error
+import urllib.parse
+import urllib.request
 
 import xbmc
 import xbmcgui
@@ -69,11 +66,12 @@ class Auth(object):
     def _make_request(self, payload):
         self.plugin.logger.notice("sending payload {} to oauth api".format(payload))
         try:
-            response = urllib2.urlopen(
-                urllib2.Request(self.OAUTH_API_URL), urllib.urlencode(payload)
+            response = urllib.request.urlopen(
+                urllib.request.Request(self.OAUTH_API_URL),
+                urllib.parse.urlencode(payload).encode("utf-8"),
             ).read()
             return json.loads(response)
-        except urllib2.HTTPError as e:
+        except urllib.error.HTTPError as e:
             if e.code == 400:
                 response = json.loads(e.read())
                 error = response.get("error")
@@ -92,7 +90,7 @@ class Auth(object):
                     return self.request(payload)
             else:
                 self.plugin.logger.fatal(
-                    "oauth request error; status: {}; message: {}".format(e.code, e.message)
+                    "oauth request error; status: {}; message: {}".format(e.code, e.reason)
                 )
                 notice("Код ответа сервера {}".format(response["status"]), "Неизвестная ошибка")
                 raise
@@ -139,7 +137,7 @@ class Auth(object):
 
     def _update_device_info(self):
         result = {"build_version": "Busy", "friendly_name": "Busy"}
-        while "Busy" in result.values():
+        while "Busy" in list(result.values()):
             result = {
                 "build_version": xbmc.getInfoLabel("System.BuildVersion"),
                 "friendly_name": xbmc.getInfoLabel("System.FriendlyName"),
