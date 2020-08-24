@@ -18,7 +18,7 @@ from resources.lib.plugin import Plugin
 
 
 content_type_map = {
-    "all": "video",
+    "all": "tvshow",
     "serial": "tvshow",
     "docuserial": "tvshow",
     "tvshow": "tvshow",
@@ -312,7 +312,7 @@ def trailer(item_id):
 def bookmarks():
     img = plugin.routing.build_icon_path("create_bookmarks_folder")
     li = plugin.list_item("Создать папку", iconImage=img, thumbnailImage=img)
-    url = plugin.routing.build_url("create_bookmarks_folder/")
+    url = plugin.routing.build_url("create_bookmarks_folder")
     xbmcplugin.addDirectoryItem(plugin.handle, url, li, False)
     response = plugin.client("bookmarks").get()
     for folder in response["items"]:
@@ -323,8 +323,8 @@ def bookmarks():
             thumbnailImage=img,
             properties={"folder-id": str(folder["id"]), "views": str(folder["views"])},
         )
-        url = plugin.routing.build_url("remove_bookmarks_folder", "{}/".format(folder["id"]))
-        li.addContextMenuItems([("Удалить", "Container.Update({})".format(url))])
+        url = plugin.routing.build_url("remove_bookmarks_folder", folder["id"])
+        li.addContextMenuItems([("Удалить", "XBMC.RunPlugin({})".format(url))])
         url = plugin.routing.build_url("bookmarks", "{}/".format(folder["id"]))
         xbmcplugin.addDirectoryItem(plugin.handle, url, li, True)
     xbmcplugin.endOfDirectory(plugin.handle)
@@ -340,9 +340,12 @@ def show_bookmark_folder(folder_id):
 @plugin.routing.route("/watching/")
 def watching():
     xbmcplugin.setContent(plugin.handle, "tvshows")
+    playback_data = {}
     for tvshow in plugin.items.watching_tvshows:
         tvshow.li_title = u"{} : [COLOR FFFFF000]+{}[/COLOR]".format(tvshow.title, tvshow.new)
+        playback_data[tvshow.item_id] = tvshow
         xbmcplugin.addDirectoryItem(plugin.handle, tvshow.url, tvshow.list_item, True)
+    plugin.set_window_property(playback_data)
     xbmcplugin.endOfDirectory(plugin.handle, cacheToDisc=False)
 
 
@@ -398,7 +401,7 @@ def collection(item_id):
     xbmcplugin.endOfDirectory(plugin.handle)
 
 
-@plugin.routing.route("/toggle_watched/<item_id>/")
+@plugin.routing.route("/toggle_watched/<item_id>")
 def toggle_watched(item_id):
     data = {"id": item_id}
     data.update(plugin.kwargs)
@@ -406,9 +409,11 @@ def toggle_watched(item_id):
     if "video" in data:
         data["time"] = 0
         plugin.client("watching/marktime").get(data=data)
+    plugin.clear_window_property()
+    xbmc.executebuiltin("Container.Refresh")
 
 
-@plugin.routing.route("/toggle_watchlist/<item_id>/")
+@plugin.routing.route("/toggle_watchlist/<item_id>")
 def toggle_watchlist(item_id):
     added = int(plugin.kwargs["added"])
     plugin.client("watching/togglewatchlist").get(data={"id": item_id})
@@ -416,9 +421,11 @@ def toggle_watchlist(item_id):
         notice('Сериал добавлен в список "Буду смотреть"')
     else:
         notice('Сериал удалён из списка "Буду смотреть"')
+    plugin.clear_window_property()
+    xbmc.executebuiltin("Container.Refresh")
 
 
-@plugin.routing.route("/edit_bookmarks/<item_id>/")
+@plugin.routing.route("/edit_bookmarks/<item_id>")
 def edit_bookmarks(item_id):
     item_folders_resp = plugin.client("bookmarks/get-item-folders").get(data={"item": item_id})
     all_folders_resp = plugin.client("bookmarks").get()
@@ -451,12 +458,13 @@ def edit_bookmarks(item_id):
     notice("Закладки для видео изменены")
 
 
-@plugin.routing.route("/remove_bookmarks_folder/<folder_id>/")
+@plugin.routing.route("/remove_bookmarks_folder/<folder_id>")
 def remove_bookmarks_folder(folder_id):
     plugin.client("bookmarks/remove-folder").post(data={"folder": folder_id})
+    xbmc.executebuiltin("Container.Refresh")
 
 
-@plugin.routing.route("/create_bookmarks_folder/")
+@plugin.routing.route("/create_bookmarks_folder")
 def create_bookmarks_folder():
     kbd = xbmc.Keyboard()
     kbd.setHeading("Имя папки закладок")
@@ -464,6 +472,7 @@ def create_bookmarks_folder():
     if kbd.isConfirmed():
         title = kbd.getText()
         plugin.client("bookmarks/create").post(data={"title": title})
+        xbmc.executebuiltin("Container.Refresh")
 
 
 @plugin.routing.route("/profile/")
@@ -479,7 +488,7 @@ def profile():
     )
 
 
-@plugin.routing.route("/comments/<item_id>/")
+@plugin.routing.route("/comments/<item_id>")
 def comments(item_id):
     response = plugin.client("items/comments").get(data={"id": item_id})
     comments = response["comments"]
@@ -499,7 +508,7 @@ def comments(item_id):
     dialog.textviewer(u'Комментарии "{}"'.format(title), message)
 
 
-@plugin.routing.route("/similar/<item_id>/")
+@plugin.routing.route("/similar/<item_id>")
 def similar(item_id):
     response = plugin.items.get("items/similar", data={"id": item_id})
     if not response.items:
