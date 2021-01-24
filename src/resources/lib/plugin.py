@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
-from __future__ import absolute_import
-
-import cPickle
+import codecs
+import pickle
 import sys
 from collections import namedtuple
-from urlparse import parse_qsl
-from urlparse import urlsplit
+from urllib.parse import parse_qsl
+from urllib.parse import urlsplit
 
 import xbmcaddon
 import xbmcgui
@@ -25,7 +24,7 @@ MainMenuItem = namedtuple("MainMenuItem", ["title", "url", "icon", "is_dir", "is
 
 class Plugin(object):
     PLUGIN_ID = xbmcaddon.Addon().getAddonInfo("id")
-    PLUGIN_URL = "plugin://{}".format(PLUGIN_ID)
+    PLUGIN_URL = f"plugin://{PLUGIN_ID}"
     settings = Settings()
 
     def __init__(self):
@@ -207,7 +206,7 @@ class Plugin(object):
 
     @property
     def sorting_title(self):
-        return "По {} {}".format(self.settings.sort_by, self.settings.sort_direction)
+        return f"По {self.settings.sort_by} {self.settings.sort_direction}"
 
     @property
     def sorting_params(self):
@@ -224,20 +223,21 @@ class Plugin(object):
         }
         direction = {"по убыванию": "-", "по возрастанию": ""}
         return {
-            "sort": "{}{}".format(
-                sorting[self.settings.sort_by], direction[self.settings.sort_direction]
-            )
+            "sort": f"{sorting[self.settings.sort_by]}{direction[self.settings.sort_direction]}"
         }
 
-    def set_window_property(self, value):
+    def clear_window_property(self):
         xbmcgui.Window(10000).clearProperty("video.kino.pub-playback_data")
-        if not isinstance(value, basestring):
-            value = cPickle.dumps(value)
-        xbmcgui.Window(10000).setProperty("video.kino.pub-playback_data", value)
+
+    def set_window_property(self, value):
+        self.clear_window_property()
+        pickled = codecs.encode(pickle.dumps(value), "base64").decode("utf-8")
+        xbmcgui.Window(10000).setProperty("video.kino.pub-playback_data", pickled)
 
     def get_window_property(self, item_id):
         try:
-            items = cPickle.loads(xbmcgui.Window(10000).getProperty("video.kino.pub-playback_data"))
+            data = xbmcgui.Window(10000).getProperty("video.kino.pub-playback_data").encode("utf-8")
+            items = pickle.loads(codecs.decode(data, "base64"))
         except EOFError:
             items = {}
         item = items.get(int(item_id), {})

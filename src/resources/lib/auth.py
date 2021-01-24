@@ -1,19 +1,17 @@
 # -*- coding: utf-8 -*-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import unicode_literals
-
 import json
 import platform
+import sys
 import time
-import urllib
-import urllib2
+import urllib.error
+import urllib.parse
+import urllib.request
+from functools import cached_property
 
 import xbmc
 import xbmcgui
 
 from resources.lib.utils import notice
-from resources.lib.utils import cached_property
 
 
 class AuthException(Exception):
@@ -73,13 +71,14 @@ class Auth(object):
         self.plugin = plugin
 
     def _make_request(self, payload):
-        self.plugin.logger.notice("sending payload {} to oauth api".format(payload))
+        self.plugin.logger.info(f"sending payload {payload} to oauth api")
         try:
-            response = urllib2.urlopen(
-                urllib2.Request(self.OAUTH_API_URL), urllib.urlencode(payload)
+            response = urllib.request.urlopen(
+                urllib.request.Request(self.OAUTH_API_URL),
+                urllib.parse.urlencode(payload).encode("utf-8"),
             ).read()
             return json.loads(response)
-        except urllib2.HTTPError as e:
+        except urllib.error.HTTPError as e:
             if e.code == 400:
                 response = json.loads(e.read())
                 error = response.get("error")
@@ -95,13 +94,14 @@ class Auth(object):
             elif e.code == 429:
                 for _ in range(2):
                     time.sleep(3)
-                    return self.request(payload)
+                    return self._make_request(payload)
             else:
+                self._auth_dialog.close(cancel=True)
                 self.plugin.logger.fatal(
-                    "oauth request error; status: {}; message: {}".format(e.code, e.message)
+                    f"oauth request error; status: {e.code}; message: {e.message}"
                 )
-                notice("Код ответа сервера {}".format(response["status"]), "Неизвестная ошибка")
-                raise
+                notice(f"Server status code {e.code}", "Activation error")
+                sys.exit()
 
     def _get_device_code(self):
         payload = {
@@ -118,7 +118,7 @@ class Auth(object):
         }
 
     def _get_device_token(self, device_code):
-        self.plugin.logger.notice("getting a new device token")
+        self.plugin.logger.info("getting a new device token")
         payload = {
             "grant_type": "device_token",
             "client_id": self.CLIENT_ID,
@@ -129,7 +129,7 @@ class Auth(object):
         self._update_settings(resp["refresh_token"], resp["access_token"], resp["expires_in"])
 
     def _refresh_token(self):
-        self.plugin.logger.notice("refreshing token")
+        self.plugin.logger.info("refreshing token")
         payload = {
             "grant_type": "refresh_token",
             "refresh_token": self.plugin.settings.refresh_token,
@@ -145,12 +145,12 @@ class Auth(object):
 
     def _update_device_info(self):
         result = {"build_version": "Busy", "friendly_name": "Busy"}
-        while "Busy" in result.values():
+        while "Busy" in list(result.values()):
             result = {
                 "build_version": xbmc.getInfoLabel("System.BuildVersion"),
                 "friendly_name": xbmc.getInfoLabel("System.FriendlyName"),
             }
-        software = "Kodi {}".format(result["build_version"].split()[0])
+        software = f"Kodi {result['build_version'].split()[0]}"
         title = result["friendly_name"] if result["friendly_name"] != "unknown" else platform.node()
         self.plugin.client("device/notify").post(
             data={"title": title, "hardware": platform.machine(), "software": software}
@@ -180,21 +180,16 @@ class Auth(object):
         self.plugin.settings.refresh_token = refresh_token
         self.plugin.settings.access_token = access_token
         self.plugin.settings.access_token_expire = str(expires_in + int(time.time()))
-        self.plugin.logger.notice(
-            "refresh token - {}; access token - {}; expires in - {}".format(
-                refresh_token, access_token, expires_in
-            )
+        self.plugin.logger.info(
+            f"refresh token - {refresh_token}; access token - {access_token}; "
+            f"expires in - {expires_in}"
         )
 
     def _activate(self):
         resp = self._get_device_code()
         self._auth_dialog.show(
-            "\n".join(
-                [
-                    "Откройте [B]{}[/B]".format(resp["verification_uri"]),
-                    "и введите следующий код: [B]{}[/B]".format(resp["user_code"]),
-                ]
-            )
+            f"Откройте [B]{resp['verification_uri']}[/B]\n"
+            f"и введите следующий код: [B]{resp['user_code']}[/B]",
         )
         self._verify_device_code(resp["refresh_interval"], resp["device_code"])
 

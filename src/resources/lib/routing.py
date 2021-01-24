@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
-from __future__ import absolute_import
-
 import re
-from urllib import urlencode
-from urlparse import urlunsplit
+from urllib.parse import urlencode
+from urllib.parse import urlunsplit
 
 import xbmc
+import xbmcvfs
 
 
 class RoutingException(Exception):
@@ -21,14 +20,14 @@ class Routing(object):
         if path.startswith(self.plugin.PLUGIN_URL):
             path = path.split(self.plugin.PLUGIN_URL, 1)[1]
 
-        for view_fun, rules in self._rules.iteritems():
+        for view_fun, rules in self._rules.items():
             for rule in rules:
                 if rule.match(path) is not None:
                     return view_fun
         return None
 
     def build_url(self, func_name, *args, **kwargs):
-        path = u"/".join([func_name] + map(unicode, list(args)))
+        path = "/".join([func_name] + [str(arg) for arg in args])
         return urlunsplit(("plugin", self.plugin.PLUGIN_ID, path, urlencode(kwargs), ""))
 
     def add_kwargs_to_url(self, **kwargs):
@@ -50,24 +49,24 @@ class Routing(object):
         self._rules[func].append(rule)
 
     def redirect(self, path):
-        xbmc.executebuiltin("Container.Update({})".format(path))
+        xbmc.executebuiltin(f"Container.Update({path})")
 
     def dispatch(self, path):
-        for view_func, rules in self._rules.iteritems():
+        for view_func, rules in self._rules.items():
             for rule in rules:
                 kwargs = rule.match(path)
                 if kwargs is not None:
                     self.plugin.logger.debug(
-                        "Dispatching to '{}', args: {}".format(view_func.__name__, kwargs)
+                        f"Dispatching to '{view_func.__name__}', args: {kwargs}"
                     )
                     view_func(**kwargs)
                     return
-        raise RoutingException('No route to path "{}"'.format(path))
+        raise RoutingException(f'No route to path "{path}"')
 
     def build_icon_path(self, name):
         """Build a path to an icon according to its name"""
-        return xbmc.translatePath(
-            "special://home/addons/{}/resources/media/{}.png".format(self.plugin.PLUGIN_ID, name)
+        return xbmcvfs.translatePath(
+            f"special://home/addons/{self.plugin.PLUGIN_ID}/resources/media/{name}.png"
         )
 
 
@@ -81,7 +80,7 @@ class UrlRule(object):
         p = re.sub("<string:([A-z]+)>", "(?P<\\1>[^/]+?)", p)
         p = re.sub("<path:([A-z]+)>", "(?P<\\1>.*)", p)
         self._compiled_pattern = p
-        self._regex = re.compile("^{}$".format(self._compiled_pattern))
+        self._regex = re.compile(f"^{self._compiled_pattern}$")
 
     def match(self, path):
         match = self._regex.search(path)
@@ -99,11 +98,11 @@ class UrlRule(object):
         url_kwargs = {((k, v) for k, v in kwargs.items() if k in self._keywords)}
         qs_kwargs = {((k, v) for k, v in kwargs.items() if k not in self._keywords)}
 
-        query = "?{}".format(urlencode(qs_kwargs)) if qs_kwargs else ""
+        query = f"?{urlencode(qs_kwargs)}" if qs_kwargs else ""
         try:
             return self._pattern.format(**url_kwargs) + query
         except KeyError:
             return None
 
-    def __str__(self):
-        return u"UrlRule(pattern={}, keywords={})".format(self._pattern, self._keywords)
+    def __repr__(self):
+        return f"UrlRule(pattern={self._pattern}, keywords={self._keywords})"

@@ -1,13 +1,11 @@
-from __future__ import absolute_import
-
 import xml.etree.ElementTree as ET
 
-import xbmc
 import xbmcaddon
+import xbmcvfs
 
 
 class Settings(object):
-    advancedsettings_file = xbmc.translatePath("special://home/userdata/advancedsettings.xml")
+    advancedsettings_file = xbmcvfs.translatePath("special://home/userdata/advancedsettings.xml")
     defaults = {
         ("video", "playcountminimumpercent"): 90,
         ("video", "ignoresecondsatstart"): 180,
