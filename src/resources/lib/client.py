@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
+import os
 import sys
 import urllib.error
 import urllib.parse
@@ -9,7 +10,7 @@ from resources.lib.utils import notice
 
 
 class KinoPubClient(object):
-    url = "https://api.service-kp.com/v1"
+    url = os.getenv("KINO_PUB_API_URL", "https://api.service-kp.com/v1")
 
     def __init__(self, plugin, action):
         self.action = action
@@ -36,13 +37,12 @@ class KinoPubClient(object):
             self.plugin.logger.error(f"{type(e).__name__}. Message: {e.message}")
             notice(e.message, "Ошибка")
         else:
-            if r := response.read():
-                response = json.loads(r)
-                if response["status"] == 200:
-                    return response
-                else:
-                    self.plugin.logger.error(f"Unknown error. Code: {response['status']}")
-                    notice(f"Код ответа сервера {response['status']}", "Ошибка")
+            response = json.loads(response.read())
+            if response["status"] == 200:
+                return response
+            else:
+                self.plugin.logger.error(f"Unknown error. Code: {response['status']}")
+                notice(f"Код ответа сервера {response['status']}", "Ошибка")
 
     def get(self, data=""):
         data = f"?{urllib.parse.urlencode(data)}" if data else ""

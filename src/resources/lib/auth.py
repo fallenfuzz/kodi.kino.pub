@@ -6,11 +6,11 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from functools import cached_property
 
 import xbmc
 import xbmcgui
 
+from resources.lib.utils import cached_property
 from resources.lib.utils import notice
 
 
@@ -64,7 +64,7 @@ class AuthDialog(object):
 class Auth(object):
     CLIENT_ID = "xbmc"
     CLIENT_SECRET = "cgg3gtifu46urtfp2zp1nqtba0k2ezxh"
-    OAUTH_API_URL = "http://api.service-kp.com/oauth2/device"
+    OAUTH_API_URL = "https://api.service-kp.com/oauth2/device"
 
     def __init__(self, plugin):
         self._auth_dialog = AuthDialog(plugin)

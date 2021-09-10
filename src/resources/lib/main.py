@@ -204,6 +204,7 @@ def new_search(content_type):
     if kbd.isConfirmed():
         title = kbd.getText()
         plugin.logger.info(title)
+        plugin.search_history.save(title)
         url = plugin.routing.build_url("search", content_type, "results/", title=title)
         plugin.routing.redirect(url)
 
@@ -211,7 +212,7 @@ def new_search(content_type):
 @plugin.routing.route("/search/<content_type>/")
 def search(content_type):
     img = plugin.routing.build_icon_path("search")
-    li = plugin.list_item("Новый Поиск", iconImage=img, thumbnailImage=img)
+    li = plugin.list_item("Новый поиск", iconImage=img, thumbnailImage=img)
     url = plugin.routing.build_url("new_search", f"{content_type}/")
     xbmcplugin.addDirectoryItem(plugin.handle, url, li, False)
 
@@ -225,8 +226,6 @@ def search(content_type):
 
 @plugin.routing.route("/search/<content_type>/results/")
 def search_results(content_type):
-    plugin.search_history.save(plugin.kwargs["title"])
-
     data = {
         "type": None if content_type == "all" else content_type.rstrip("s"),
         "title": plugin.kwargs["title"],
@@ -313,7 +312,7 @@ def bookmarks():
             properties={"folder-id": str(folder["id"]), "views": str(folder["views"])},
         )
         url = plugin.routing.build_url("remove_bookmarks_folder", folder["id"])
-        li.addContextMenuItems([("Удалить", f"XBMC.RunPlugin({url})")])
+        li.addContextMenuItems([("Удалить", f"RunPlugin({url})")])
         url = plugin.routing.build_url("bookmarks", f"{folder['id']}/")
         xbmcplugin.addDirectoryItem(plugin.handle, url, li, True)
     xbmcplugin.endOfDirectory(plugin.handle)

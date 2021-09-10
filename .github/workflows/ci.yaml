@@ -1,0 +1,48 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    types: ["opened", "synchronize", "reopened"]
+  create:
+
+jobs:
+  lint:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: "3.6"
+          architecture: "x64"
+      - name: Pre-commit checks
+        uses: pre-commit/action@v2.0.0
+      - name: Analysis (git diff)
+        if: failure()
+        run: git diff
+  tests:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: "3.6"
+          architecture: "x64"
+      - name: Install deps
+        run: pip install pytest wait_for kodi-json
+      - name: Pull conkodi container image
+        run: podman pull quay.io/quarck/conkodi:19
+      - name: Pull mockserver container image
+        run: podman pull docker.io/mockserver/mockserver:mockserver-5.11.2
+      - name: Set permissions
+        run: sudo chmod -R a+rwx tests/data
+      - name: Integration tests
+        run: pytest -vv
+      - name: Kodi logs analysis
+        if: failure()
+        run: podman logs kodi
+      - name: Mockserver logs analysis
+        if: failure()
+        run: podman logs mockserver
