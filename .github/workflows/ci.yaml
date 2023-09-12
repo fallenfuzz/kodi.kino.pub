@@ -9,37 +9,40 @@ on:
   create:
 
 jobs:
-  lint:
-    runs-on: ubuntu-20.04
+  tests-unit:
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
         with:
-          python-version: "3.6"
-          architecture: "x64"
-      - name: Pre-commit checks
-        uses: pre-commit/action@v2.0.0
-      - name: Analysis (git diff)
-        if: failure()
-        run: git diff
-  tests:
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-        with:
-          python-version: "3.6"
+          python-version: "3.10"
           architecture: "x64"
       - name: Install deps
-        run: pip install pytest wait_for kodi-json
+        run: pip install -r requirements_dev.txt
+      - name: Unit tests
+        run: make test_unit
+
+  tests-integration:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        kodi-version: ["19", "20"]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+        with:
+          python-version: "3.10"
+          architecture: "x64"
+      - name: Install deps
+        run: pip install -r requirements_dev.txt
       - name: Pull conkodi container image
-        run: podman pull quay.io/quarck/conkodi:19
+        run: podman pull quay.io/quarck/conkodi:${{ matrix.kodi-version }}
       - name: Pull mockserver container image
         run: podman pull docker.io/mockserver/mockserver:mockserver-5.11.2
       - name: Set permissions
-        run: sudo chmod -R a+rwx tests/data
+        run: sudo chmod -R a+rw tests/data
       - name: Integration tests
-        run: pytest -vv
+        run: make test_integration
       - name: Kodi logs analysis
         if: failure()
         run: podman logs kodi

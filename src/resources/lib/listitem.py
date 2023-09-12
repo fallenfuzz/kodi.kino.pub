@@ -1,33 +1,45 @@
-# -*- coding: utf-8 -*-
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
+from typing import TYPE_CHECKING
+
 from xbmcgui import ListItem
+
+if TYPE_CHECKING:
+    from resources.lib.plugin import Plugin
+
+from resources.lib.utils import localize
 
 
 class ExtendedListItem(ListItem):
-    def __new__(cls, name, label2="", path="", **kwargs):
-        return super(ExtendedListItem, cls).__new__(cls, name, label2, path)
+    def __new__(cls, name: str, label2: str = "", path: str = "", **kwargs) -> "ExtendedListItem":
+        return super().__new__(cls, name, label2, path)
 
     def __init__(
         self,
-        name,
-        label2="",
-        iconImage="",
-        thumbnailImage="",
-        path="",
-        poster=None,
-        fanart=None,
-        video_info=None,
-        properties=None,
-        addContextMenuItems=False,
-        subtitles=None,
-        plugin=None,
-    ):
-        super(ExtendedListItem, self).__init__(name, label2, path)
+        *,
+        name: str,
+        plugin: "Plugin",
+        label2: str = "",
+        iconImage: str = "",
+        thumbnailImage: str = "",
+        path: str = "",
+        poster: Optional[str] = None,
+        fanart: Optional[str] = None,
+        video_info: Optional[Dict[str, Any]] = None,
+        properties: Optional[Dict[str, Any]] = None,
+        addContextMenuItems: bool = False,
+        subtitles: Optional[List[str]] = None,
+    ) -> None:
+        super().__init__(name, label2, path)
         self.plugin = plugin
         if properties:
             self.setProperties(**properties)
         if video_info:
             self.setInfo("video", video_info)
-            self.setResumeTime(video_info.get("time"))
+            self.setResumeTime(video_info.get("time", 0))
         if poster:
             self.setArt({"poster": poster})
         if fanart:
@@ -41,23 +53,26 @@ class ExtendedListItem(ListItem):
         if addContextMenuItems:
             self.addPredefinedContextMenuItems()
 
-    def _addWatchlistContextMenuItem(self, menu_items):
-        in_watchlist = self.getProperty("in_watchlist")
-        if in_watchlist == "":
+    def _addWatchlistContextMenuItem(self, menu_items: List[Tuple[str, str]]) -> None:
+        is_subscribed = self.getProperty("is_subscribed")
+        if is_subscribed == "":
             return
-        label = "Не буду смотреть" if int(in_watchlist) else "Буду смотреть"
+        is_subscribed = is_subscribed == "True"
+        # Won't watch, Will watch
+        label = localize(32009) if is_subscribed else localize(32010)
         url = self.plugin.routing.build_url(
-            "toggle_watchlist", self.getProperty("id"), added=int(not int(in_watchlist))
+            "toggle_watchlist", self.getProperty("id"), added=int(not is_subscribed)
         )
         menu_items.append((label, f"Container.Update({url})"))
 
-    def _addWatchedContextMenuItem(self, menu_items):
+    def _addWatchedContextMenuItem(self, menu_items: List[Tuple[str, str]]) -> None:
         item_id = self.getProperty("id")
         season_number = self.getVideoInfoTag().getSeason()
         video_number = self.getVideoInfoTag().getEpisode()
         video_number = video_number if video_number != -1 else 1
         watched = int(self.getVideoInfoTag().getPlayCount()) > 0
-        label = "Отметить как непросмотренное" if watched else "Отметить как просмотренное"
+        # Mark as unseen, Mark as seen
+        label = localize(32011) if watched else localize(32012)
         if self.getVideoInfoTag().getMediaType() == "tvshow":
             return
         elif self.getVideoInfoTag().getMediaType() == "season":
@@ -71,46 +86,49 @@ class ExtendedListItem(ListItem):
         url = self.plugin.routing.build_url("toggle_watched", item_id, **kwargs)
         menu_items.append((label, f"Container.Update({url})"))
 
-    def _addBookmarksContextMenuItem(self, menu_items):
+    def _addBookmarksContextMenuItem(self, menu_items: List[Tuple[str, str]]) -> None:
         if self.getVideoInfoTag().getMediaType() == "season":
             return
         item_id = self.getProperty("id")
-        label = "Изменить закладки"
+        # Change bookmarks
+        label = localize(32013)
         url = self.plugin.routing.build_url("edit_bookmarks", item_id)
         menu_items.append((label, f"Container.Update({url})"))
 
-    def _addCommentsContextMenuItem(self, menu_items):
+    def _addCommentsContextMenuItem(self, menu_items: List[Tuple[str, str]]) -> None:
         item_id = self.getProperty("id")
-        label = "Комментарии KinoPub"
+        # kino.pub comments
+        label = localize(32014)
         url = self.plugin.routing.build_url("comments", item_id)
         menu_items.append((label, f"Container.Update({url})"))
 
-    def _addSimilarContextMenuItem(self, menu_items):
+    def _addSimilarContextMenuItem(self, menu_items: List[Tuple[str, str]]) -> None:
         item_id = self.getProperty("id")
         title = self.getLabel()
-        label = "Похожие фильмы"
+        # Similar movies
+        label = localize(32015)
         url = self.plugin.routing.build_url("similar", item_id, title=title)
         menu_items.append((label, f"Container.Update({url})"))
 
-    def _addSeparatorContextMenuItem(self, menu_items):
+    def _addSeparatorContextMenuItem(self, menu_items: List[Tuple[str, str]]) -> None:
         # 21 is the maximum number of characters when the horizontal scrolling doesn't appear.
         menu_items.append(("─" * 21, ""))
 
-    def addPredefinedContextMenuItems(self, items=None):
+    def addPredefinedContextMenuItems(self, items: Optional[List[str]] = None) -> None:
         items = items or ["watched", "watchlist", "bookmarks", "comments", "similar", "separator"]
-        menu_items = []
+        menu_items: List[str] = []
         for item in items:
             getattr(self, f"_add{item.capitalize()}ContextMenuItem")(menu_items)
         self.addContextMenuItems(menu_items)
 
-    def setProperties(self, **properties):
+    def setProperties(self, **properties) -> None:
         for prop, value in properties.items():
             self.setProperty(prop, str(value))
 
-    def setResumeTime(self, resumetime, totaltime=None):
+    def setResumeTime(self, resumetime: int, totaltime: float = 0.0) -> None:
         totaltime = float(totaltime or self.getVideoInfoTag().getDuration())
         if (
-            resumetime is not None
+            resumetime > 0
             and totaltime > 0
             and 100 * resumetime / totaltime
             <= self.plugin.settings.advanced("video", "playcountminimumpercent")
@@ -119,6 +137,6 @@ class ExtendedListItem(ListItem):
         ):
             self.setProperties(resumetime=resumetime, totaltime=totaltime)
 
-    def markAdvert(self, has_advert):
+    def markAdvert(self, has_advert: bool) -> None:
         if self.plugin.settings.mark_advert == "true" and has_advert:
             self.setLabel(f"{self.getLabel()} (!)")
