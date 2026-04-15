@@ -26,6 +26,7 @@ from resources.lib.routing import Routing
 from resources.lib.search_history import SearchHistory
 from resources.lib.settings import Settings
 from resources.lib.utils import localize
+from resources.lib.xbmc_settings import XbmcProxySettings
 
 
 try:
@@ -53,6 +54,7 @@ class Plugin:
         self.main_menu_items = self._main_menu_items()
         self.items = ItemsCollection(self)
         self.client = KinoPubClient(self)
+        self.proxy_settings = XbmcProxySettings(self)
 
     def list_item(
         self,
@@ -123,27 +125,6 @@ class Plugin:
                 self.routing.build_icon_path("watching_movies"),
                 True,
                 True,
-            ),
-            MainMenuItem(
-                localize(32020),
-                self.routing.build_url("items", "all", "fresh/"),
-                self.routing.build_icon_path("fresh"),
-                True,
-                self.settings.show_last,
-            ),
-            MainMenuItem(
-                localize(32022),
-                self.routing.build_url("items", "all", "popular/"),
-                self.routing.build_icon_path("popular"),
-                True,
-                self.settings.show_popular,
-            ),
-            MainMenuItem(
-                localize(32021),
-                self.routing.build_url("items", "all", "hot/"),
-                self.routing.build_icon_path("hot"),
-                True,
-                self.settings.show_hot,
             ),
             MainMenuItem(
                 self.sorting_title,
